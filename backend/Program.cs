@@ -40,18 +40,46 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    try
+    
+    // PostgreSQL bağlantısı için yeniden deneme mekanizması
+    var maxRetryCount = 5;
+    var retryIntervalSeconds = 10;
+    var currentRetry = 0;
+    
+    while (currentRetry < maxRetryCount)
     {
-        var context = services.GetRequiredService<AppDbContext>();
-        // Veritabanı varsa migrate et, yoksa oluştur
-        context.Database.Migrate();
-        // Seed data eklemek için buraya kod eklenebilir
-        Console.WriteLine("Veritabanı migration başarılı.");
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Veritabanı migration hatası.");
+        try
+        {
+            Console.WriteLine($"Veritabanı bağlantısı deneniyor... Deneme: {currentRetry + 1}");
+            
+            var context = services.GetRequiredService<AppDbContext>();
+            
+            // Önce bağlantıyı test et
+            context.Database.OpenConnection();
+            context.Database.CloseConnection();
+            
+            // Bağlantı başarılıysa migrasyonu uygula
+            context.Database.Migrate();
+            
+            Console.WriteLine("Veritabanı migration başarılı.");
+            break;
+        }
+        catch (Exception ex)
+        {
+            currentRetry++;
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, $"Veritabanı migration hatası. Kalan deneme: {maxRetryCount - currentRetry}");
+            
+            if (currentRetry < maxRetryCount)
+            {
+                Console.WriteLine($"{retryIntervalSeconds} saniye sonra tekrar denenecek...");
+                Thread.Sleep(retryIntervalSeconds * 1000);
+            }
+            else
+            {
+                Console.WriteLine("Maksimum deneme sayısına ulaşıldı. Veritabanı migrasyonu başarısız!");
+            }
+        }
     }
 }
 
