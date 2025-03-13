@@ -1,15 +1,19 @@
-FROM node:18-alpine AS base
+# 1. Node.js 20'yi kullan
+FROM node:18-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+
+# 2. Bağımlılıkları yükle
+COPY package.json package-lock.json ./
 RUN npm install
+
+# 3. Tüm projeyi kopyala ve Next.js build et
 COPY . .
 RUN npm run build
 
-FROM node:18-alpine
+# 4. Production için bir runtime ortamı oluştur
+FROM node:18-alpine AS runtime
 WORKDIR /app
-COPY --from=base /app/.next ./.next
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/package*.json ./
-COPY --from=base /app/public ./public
-EXPOSE 3000
+COPY --from=build /app . 
+
+# 5. Next.js uygulamasını başlat
 CMD ["npm", "start"]

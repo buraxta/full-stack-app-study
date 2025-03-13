@@ -1,10 +1,13 @@
 import axios from "axios";
 
-// Browser'da çalışırken localhost'a erişebilmesi için URL'i düzenliyoruz
-const isDevelopment = process.env.NODE_ENV === "development";
-const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (isDevelopment ? "http://localhost:5000/todo" : "http://backend:5000/todo");
+// Browser-side URL vs. Server-side URL configuration
+const isBrowser = typeof window !== "undefined";
+
+const apiUrl = isBrowser
+  ? // In browser, use localhost with the exposed port
+    "http://localhost:5000/todo"
+  : // In server-side (Next.js SSR), use the Docker service name
+    "http://backend:8080/todo";
 
 export const db = axios.create({
   baseURL: apiUrl,
