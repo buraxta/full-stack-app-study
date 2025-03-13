@@ -18,19 +18,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
-        "CorsPolicy",
-        policy =>
-        {
-            policy
-                .WithOrigins(
-                    "http://localhost:3000",
-                    "http://127.0.0.1:3000",
-                    "http://frontend:3000"
-                )
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
-        }
+        "AllowAll",
+        policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()
     );
 });
 
@@ -40,27 +29,27 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    
+
     // PostgreSQL bağlantısı için yeniden deneme mekanizması
     var maxRetryCount = 5;
     var retryIntervalSeconds = 10;
     var currentRetry = 0;
-    
+
     while (currentRetry < maxRetryCount)
     {
         try
         {
             Console.WriteLine($"Veritabanı bağlantısı deneniyor... Deneme: {currentRetry + 1}");
-            
+
             var context = services.GetRequiredService<AppDbContext>();
-            
+
             // Önce bağlantıyı test et
             context.Database.OpenConnection();
             context.Database.CloseConnection();
-            
+
             // Bağlantı başarılıysa migrasyonu uygula
             context.Database.Migrate();
-            
+
             Console.WriteLine("Veritabanı migration başarılı.");
             break;
         }
@@ -68,8 +57,11 @@ using (var scope = app.Services.CreateScope())
         {
             currentRetry++;
             var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ex, $"Veritabanı migration hatası. Kalan deneme: {maxRetryCount - currentRetry}");
-            
+            logger.LogError(
+                ex,
+                $"Veritabanı migration hatası. Kalan deneme: {maxRetryCount - currentRetry}"
+            );
+
             if (currentRetry < maxRetryCount)
             {
                 Console.WriteLine($"{retryIntervalSeconds} saniye sonra tekrar denenecek...");
@@ -77,7 +69,9 @@ using (var scope = app.Services.CreateScope())
             }
             else
             {
-                Console.WriteLine("Maksimum deneme sayısına ulaşıldı. Veritabanı migrasyonu başarısız!");
+                Console.WriteLine(
+                    "Maksimum deneme sayısına ulaşıldı. Veritabanı migrasyonu başarısız!"
+                );
             }
         }
     }
